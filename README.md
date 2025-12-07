@@ -1,127 +1,221 @@
-Galactic Message Relay
+🚀 Galactic Message Relay System
 
-Galactic Message Relay is a Node.js + Express + Redis project demonstrating a producer-consumer message queue system with idempotency, retries, and poison queue handling.
-This system contains two services:
+A simple distributed message relay system built using Node.js, Express, and Redis, designed to demonstrate:
 
-Producer (API server) → Receives messages from clients and pushes them into Redis
+✔ Exactly-once message processing
+✔ Idempotency (duplicate detection)
+✔ Retry mechanism on processing failure
 
-Consumer (Worker) → Pulls messages from Redis and processes them exactly once
+This system has two services:
 
-Project Structure
+Producer API → receives messages & pushes them into a Redis queue
+
+Consumer Worker → pulls messages and processes them exactly once
+
+📁 Project Structure
 galactic-relay/
+│
 ├── producer/
-│   ├── app.js         # Express server: POST /command, GET /status
-│   ├── queue.js       # Redis connection and queue helpers
-│   └── package.json
+│   ├── server.js
+│   ├── package.json
+│   └── node_modules/
+│
 ├── consumer/
-│   ├── worker.js      # Consumer with retry and poison queue
-│   ├── queue.js       # Redis connection
-│   └── package.json
+│   ├── worker.js
+│   ├── package.json
+│   └── node_modules/
+│
 └── README.md
 
-Setup Commands
-1️⃣ Install dependencies
+🛠️ Setup Instructions (Evaluator Must Follow These Steps)
+1️⃣ Install Redis
+
+Ensure Redis is installed and running.
+
+Start Redis:
+redis-server
+
+Check if Redis is running:
+redis-cli ping
+
+
+Expected output:
+
+PONG
+
+📦 2️⃣ Install Dependencies
+Producer Service
 cd producer
 npm install
-cd ../consumer
-npm install
 
-2️⃣ Start Redis server
-net start redis
-
-3️⃣ Verify Redis
-redis-cli ping   # Should respond PONG
-netstat -ano | findstr :6379  # Check if Redis port 6379 is listening
-
-Run the Application
-
-Start Producer
-
-cd producer
-node app.js
-
-
-Start Consumer
-
+Consumer Service
 cd consumer
-node worker.js
-
-Testing Commands
-
-Send message to queue
-
-PowerShell:
-
-Invoke-WebRequest -Uri "http://localhost:3000/command" -Method POST -Body '{"message_id":"test001","payload":"hello galaxy"}' -ContentType "application/json"
+npm install
 
 
-cURL:
+This will recreate node_modules if deleted.
 
-curl -X POST http://localhost:3000/command -H "Content-Type: application/json" -d '{"message_id":"test001","payload":"hello galaxy"}'
-
-
-Check message status
-
-Invoke-WebRequest -Uri "http://localhost:3000/status/test001" -Method GET
+▶️ 3️⃣ Run the System
+Start Producer API
+cd producer
+node server.js
 
 
-Response example:
+Producer runs at:
 
-{"message_id":"test001","status":"queued"}
+http://localhost:3000
 
-
-Observe consumer logs
-
+Start Consumer Worker
 cd consumer
 node worker.js
 
 
-Logs include:
+Consumer will listen for messages from Redis.
 
-Consumer worker started...
+📤 4️⃣ Test the System
+✔ Send message to Producer API
+
+Using PowerShell:
+
+Invoke-WebRequest -Uri "http://localhost:3000/produce?msg=test001"
+
+
+Producer output:
+
+Message queued successfully
+
+
+Consumer output:
+
+Processing message: test001
+
+✔ Test Duplicate Handling (Idempotency)
+
+Run same command again:
+
+Invoke-WebRequest -Uri "http://localhost:3000/produce?msg=test001"
+
+
+Consumer output:
 
 Skipping duplicate: test001
 
-Retrying (1) for test001
+✔ Test Message Queue in Redis
 
-Successfully processed: test001
+Check queue length:
 
-Moved to poison queue: test001
-
-Key Conditions / Functionalities
-
-Idempotency (Prevent Duplicate Processing)
-
-Messages with the same message_id are skipped if already processed.
-
-Redis SET called PROCESSED_SET tracks processed messages.
-
-Example Log: Skipping duplicate: test001
-
-Retry Mechanism (Temporary Failures)
-
-Messages that fail processing are retried up to 2 times.
-
-Example Log:
-
-Error: Simulated processing failure
-Retrying (1) for test001
+redis-cli llen messageQueue
 
 
-Poison Queue (Permanent Failures)
+Check processed messages:
 
-Messages that fail more than 2 times are moved to a poison queue.
+redis-cli smembers processedMessages
 
-Allows later analysis and prevents infinite retries.
+🔁 5️⃣ Retry Mechanism Example
 
-Example Log: Moved to poison queue: test001
+Inside worker.js, processing is wrapped with:
 
-Features
+try {
+   // processing logic
+} catch (err) {
+   await redis.rpush("messageQueue", message);
+}
 
-Node.js + Express producer server
 
-Redis queue for message passing
+Meaning:
 
-Idempotency, retries, and poison queue handling
+If processing fails → message is returned to queue
 
-Easy to test via PowerShell or cURL
+Consumer retries
+
+No message is lost
+
+🎯 6️⃣ Key Conditions Implemented
+1. Exactly-Once Processing
+
+A Redis SET called processedMessages stores all processed messages.
+
+Before processing, the worker checks:
+
+if (await redis.sismember("processedMessages", message)) {
+    console.log("Skipping duplicate:", message);
+    continue;
+}
+
+
+This ensures each message is processed only once.
+
+2. Idempotency
+
+Messages with the same ID (msg value) are not processed twice.
+
+Duplicate messages are skipped instantly.
+
+Verified using:
+
+Invoke-WebRequest -Uri "http://localhost:3000/produce?msg=test001"
+Invoke-WebRequest -Uri "http://localhost:3000/produce?msg=test001"
+
+3. Retry on Failure
+
+If processing throws an error:
+
+Message is pushed back to Redis
+
+Worker attempts again
+
+Allows recovery from temporary failures
+
+🧪 7️⃣ All Commands Used (Full List)
+Git Commands
+git init
+git add .
+git commit -m "Initial commit"
+git remote add origin <repo-url>
+git branch -M main
+git push -u origin main
+
+Redis Commands
+redis-server
+redis-cli ping
+redis-cli llen messageQueue
+redis-cli smembers processedMessages
+
+Producer Commands
+cd producer
+npm install
+node server.js
+
+Consumer Commands
+cd consumer
+npm install
+node worker.js
+
+PowerShell API Testing
+Invoke-WebRequest -Uri "http://localhost:3000/produce?msg=test001"
+Invoke-WebRequest -Uri "http://localhost:3000/produce?msg=test002"
+Invoke-WebRequest -Uri "http://localhost:3000/produce?msg=test001"  # duplicate test
+
+🧠 How Everything Works (Short Explanation)
+
+Producer receives message → pushes to Redis list messageQueue
+
+Consumer reads queue continuously
+
+Before processing, consumer checks Redis SET:
+
+If processed already → skip
+
+Else → process
+
+After success → message is added to processedMessages
+
+If error happens → message returned to queue (retry)
+
+This guarantees:
+
+No message loss
+
+No message duplication
+
+Fault tolerance
