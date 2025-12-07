@@ -27,6 +27,7 @@ galactic-relay/
 │
 └── README.md
 
+
 🛠️ Setup Instructions (Evaluator Must Follow These Steps)
 1️⃣ Install Redis
 
