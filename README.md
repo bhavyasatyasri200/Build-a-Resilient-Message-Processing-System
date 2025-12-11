@@ -35,13 +35,16 @@ galactic-relay/
 
 ### 🛠️ Setup Instructions (Evaluator Must Follow These Steps)
 
-#### 1️⃣ Install Redis
-
+#### 1️.Install dependencies
+```
+npm install express body-parser redis uuid
+```
 Ensure Redis is installed and running.
 
 Start Redis:
 ```
-redis-server
+net start redis
+
 ```
 
 Check if Redis is running:
@@ -56,7 +59,7 @@ PONG
 
 ***
 
-#### 📦 2️⃣ Install Dependencies
+#### 📦 2️. Install Dependencies
 
 **Producer Service**
 ```
@@ -74,7 +77,7 @@ This recreates `node_modules` if deleted.
 
 ***
 
-#### ▶️ 3️⃣ Run the System
+#### ▶️ 3️. Run the System
 
 **Start Producer API**
 ```
@@ -101,17 +104,22 @@ The consumer listens for messages from Redis.
 
 Using PowerShell:
 ```
-Invoke-WebRequest -Uri "http://localhost:3000/produce?msg=test001"
+curl -X POST http://localhost:3000/command \
+  -H "Content-Type: application/json" \
+  -d "{\"message_id\":\"msg001\",\"payload\":\"hello galaxy\"}"
 ```
 
 Producer output:
 ```
-Message queued successfully
+Producer running on port 3000
 ```
 
 Consumer output:
 ```
-Processing message: test001
+Consumer work started...
+Processing message msg001
+Successfully processed: msg001
+Message completed: msg001
 ```
 
 ***
@@ -120,12 +128,16 @@ Processing message: test001
 
 Run the same command again:
 ```
-Invoke-WebRequest -Uri "http://localhost:3000/produce?msg=test001"
+curl -X POST http://localhost:3000/command \
+  -H "Content-Type: application/json" \
+  -d "{\"message_id\":\"msg001\",\"payload\":\"hello galaxy\"}"
+
 ```
 
 Consumer output:
 ```
 Skipping duplicate: test001
+
 ```
 
 ***
@@ -134,12 +146,7 @@ Skipping duplicate: test001
 
 Check the queue length:
 ```
-redis-cli llen messageQueue
-```
-
-Check processed messages:
-```
-redis-cli smembers processedMessages
+Invoke-WebRequest -Uri "http://localhost:3000/status" -Method GET
 ```
 
 ***
